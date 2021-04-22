@@ -1,0 +1,297 @@
+<!--- Begin styling code. --->
+<style type="text/css">
+/* Whole document: */
+body{
+  font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+  font-size: 12pt;
+}
+h1.title {
+  font-size: 38px;
+  text-align: center;
+}
+h4.author {
+  font-size: 18px;
+  text-align: center;
+}
+h4.date {
+  font-size: 18px;
+  text-align: center;
+}
+</style>
+<!--- End styling code. --->
+
+---
+title: "Project 2: SVD Analysis of Partisanship in U.S. Congress"
+author: "Sylvia Du, Dairong Han"
+date: "2/19/2020"
+output: html_document
+---
+
+```{r, eval = TRUE, echo = FALSE, message = FALSE}
+library(tidyverse)
+library(gapminder)
+library(kableExtra)
+library(splitstackshape)
+library(ggrepel)
+library(RColorBrewer)
+```
+
+
+# Visualization and Analysis
+
+```{r, echo = FALSE, eval = TRUE, message = FALSE}
+# read all 4 datasets from the URLs and write to local directory
+house90 <- read_csv("https://raw.githubusercontent.com/bryandmartin/STAT302/master/docs/Projects/project2/house_90_raw.csv")
+write_csv(house90, "./house90.csv")
+senate90 <- read_csv("https://raw.githubusercontent.com/bryandmartin/STAT302/master/docs/Projects/project2/senate_90_raw.csv")
+write_csv(senate90, "./senate90.csv")
+house116 <- read_csv("https://raw.githubusercontent.com/bryandmartin/STAT302/master/docs/Projects/project2/house_116_raw.csv")
+write_csv(house116, "./house116.csv")
+senate116 <- read_csv("https://raw.githubusercontent.com/bryandmartin/STAT302/master/docs/Projects/project2/senate_116_raw.csv")
+write_csv(senate116, "./senate116.csv")
+
+# set all NAs in the 4 datasets to be 0
+house90[is.na(house90)] <- 0
+senate90[is.na(senate90)] <- 0
+house116[is.na(house116)] <- 0
+senate116[is.na(senate116)] <- 0
+
+########## decide to set all NAs to 0, since make no difference
+
+# main: WA perspective
+# 1. WA house && senate vs total house && senate
+# 2. 90th vs 116th total && WA
+# 3. WA house && senate vs TX
+# 4. total house age D vs R
+
+```
+## Introduction
+
+The Democratic Party and Republican Party are the two major contemporary political parties in the United States. By taking up most of the seats in the Congress, these two parties have always been exerting immeasurable influence on the political environment in the United States, from the formulation of people’s livelihood policy to the election of the president.
+
+These visualizations below present comparations of Congress voting data of the 90th house and senate in 1967 and the 116th house and senate in 2019. We are focusing on comparations between the two Congress voting data as well as the difference of partisanship between Washington (WA), our Democratic State, and Texas (TX), one of the Republican states. Finally, we are comparing the different distributions of people's age in Republican and Democratic Party. 
+
+## Total house vs senate between 90th and 116th Congress
+
+In the following visualizations, all the NAs in the dataset are set to 0. While 1 represents a "Yea" vote and -1 represents a "Nay" vote, both 0 and NA contribute nothing toward the partisanship. The 4 following visualizations are clustering SVD image analysis presenting the 90th and 116th senate and house voting data. In each plot, x and y are from the U matrix of SVD, the two columns with the most energy maintained, in other words, the best approximation we can do in two dimensional plots. The U matrix, containing the voter-to-party values, shows the tendency of people with similar decisions on votes clustering together.
+ 
+```{r, echo = FALSE, eval = TRUE, message = FALSE}
+# apply svd to all four datasets excluding the state abbreviations, party codes,
+# voters' names, and their year of birth 
+house90_svd <- svd(house90[, -c(1, 2, 3, 4)])
+senate90_svd <- svd(senate90[, -c(1, 2, 3, 4)])
+house116_svd <- svd(house116[, -c(1, 2, 3, 4)])
+senate116_svd <- svd(senate116[, -c(1, 2, 3, 4)])
+
+# set colors for the three parties in voting data, name the color vector with 
+# initials of the three parties
+myColors <- brewer.pal(3,"Set1")
+names(myColors) <- c("R", "D", "I")
+
+# create dataframe for 90th house svd, 
+# make a jitter plot with rug plot indicating the density
+house90_df <- data.frame("x" = house90_svd$u[, 1], "y" = house90_svd$u[, 2],
+                         "label" = house90$party_code,
+                         "state" = house90$state_abbrev)
+ggplot(house90_df, aes(x = x, y = y, color = label)) +
+  geom_point() +
+  theme_bw(base_size = 20) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14)) +
+  labs(title = "90th House") +
+  scale_colour_manual(name = "", values = myColors) +
+  geom_rug(position = "jitter", size = 0.1) +
+  geom_text_repel(data = subset(house90_df, state == "WA" | state == "TX"),
+            aes(x, y, label = state), color = "black")
+
+# compute energy maintained in this two dimensional plot
+h90_sig <- house90_svd$d^2
+energy_h90 <- (h90_sig[1] + h90_sig[2]) / sum(h90_sig)
+
+# create dataframe for 90th senate svd, 
+# make a jitter plot with rug plot indicating the density
+senate90_df <- data.frame("x" = senate90_svd$u[, 1], "y" = senate90_svd$u[, 2],
+                         "label" = senate90$party_code, 
+                         "state" = senate90$state_abbrev)
+ggplot(senate90_df, aes(x = x, y = y, color = label)) +
+  geom_point() +
+  theme_bw(base_size = 20) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14)) +
+  labs(title = "90th Senate") +
+  scale_colour_manual(name = "", values = myColors) +
+  geom_rug(position = "jitter", size = 0.1) +
+  geom_text_repel(data = subset(senate90_df, state == "WA" | state == "TX"),
+            aes(x, y, label = state), color = "black")
+
+# compute energy maintained in this two dimensional plot
+s90_sig <- senate90_svd$d^2
+energy_s90 <- (s90_sig[1] + s90_sig[2]) / sum(s90_sig)
+
+# create dataframe for 116th house svd, 
+# make a jitter plot with rug plot indicating the density
+house116_df <- data.frame("x" = house116_svd$u[, 1], "y" = house116_svd$u[, 2],
+                         "label" = house116$party_code, 
+                         "state" = house116$state_abbrev)
+ggplot(house116_df, aes(x = x, y = y, color = label)) +
+  geom_point() +
+  theme_bw(base_size = 20) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14)) +
+  labs(title = "116th House") +
+  scale_colour_manual(name = "", values = myColors) +
+  geom_rug(position = "jitter", size = 0.1) +
+  geom_text_repel(data = subset(house116_df, state == "WA" | state == "TX"),
+            aes(x, y, label = state), color = "black")
+
+# compute energy maintained in this two dimensional plot
+h116_sig <- house116_svd$d^2
+energy_h116 <- (h116_sig[1] + h116_sig[2]) / sum(h116_sig)
+
+
+# create dataframe for 116th senate svd, 
+# make a jitter plot with rug plot indicating the density
+senate116_df <- data.frame("x" = senate116_svd$u[, 1], 
+                           "y" = senate116_svd$u[, 2],
+                         "label" = senate116$party_code, 
+                         "state" = senate116$state_abbrev)
+ggplot(senate116_df, aes(x = x, y = y, color = label)) +
+  geom_point() +
+  theme_bw(base_size = 20) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14)) +
+  labs(title = "116th Senate") +
+  geom_rug(position = "jitter", size = 0.1) +
+  geom_text_repel(data = subset(senate116_df, state == "WA" | state == "TX"),
+            aes(x, y, label = state), color = "black") +
+  scale_colour_manual(name = "", values = myColors)
+
+# compute energy maintained in this two dimensional plot
+s116_sig <- senate116_svd$d^2
+energy_s116 <- (s116_sig[1] + s116_sig[2]) / sum(s116_sig)
+```
+
+According to the first two images, there were not so many differences between the house and senate voting inclination in the 90th Congress, with the democrats clustering in the top-left part of the image, while the republicans cluster at the bottom left in both house and senate. However, the house and senate voting preference turned into opposite in the 116th Congress. In the 116th house Congress, the democrats are clustering at the top left of the image and the republicans are clustering at the bottom right of the image. While in the 116th senate, the delegates cluster switched, with the republicans clustering at the top left corner, and the democrats clustering at the bottom right.
+
+The energy maintained in the four visualizations are respectively `r round(energy_h90, 2) * 100`%, `r round(energy_s90, 2) * 100`%, `r round(energy_h116, 2) * 100`%, and `r round(energy_s116, 2) * 100`% (rounded to two decimal places).
+
+
+## 90th vs 116th total &WA:
+
+Also, according to the 4 images shown in part 1, the voting preference of WA delegates were figured out. In the 90th Congress, most WA delegates were showing democratic preference, with only 2 house partisan delegates were republican. And such situation has not changed so much as we can see from the 116th Congress image, with most of the WA delegates still in democratic campaign, only 3 house delegates in WA are republicans.
+
+
+## WA house and senate vs TX house and senate
+```{r, echo = FALSE, eval = TRUE, message = FALSE}
+# create dataframe for 90th house svd only considering WA and TX,
+# make a jitter plot with rug plot indicating the density
+house90_df2 <- house90_df %>% filter(state == "WA" | state == "TX")
+ggplot(house90_df2, aes(x = x, y = y, color = label)) +
+  geom_point() +
+  theme_bw(base_size = 20) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14)) +
+  labs(title = "90th house WA vs TX") +
+  scale_colour_manual(name = "", values = myColors) +
+  geom_rug(position = "jitter", size = 0.1) +
+  geom_text_repel(aes(x, y, label = state), color = "black")
+
+# create dataframe for 116th house svd only considering WA and TX,
+# make a jitter plot with rug plot indicating the density
+house116_df2 <- house116_df %>% filter(state == "WA" | state == "TX")
+ggplot(house116_df2, aes(x = x, y = y, color = label)) +
+  geom_point() +
+  theme_bw(base_size = 20) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14)) +
+  labs(title = "116th house WA vs TX") +
+  scale_colour_manual(name = "", values = myColors) +
+  geom_rug(position = "jitter", size = 0.1) +
+  geom_text_repel(aes(x, y, label = state), color = "black")
+```
+
+These two visualizations above are clustering SVD image analysis, presenting the 90th and the 116th house Congress voting differences between partisans from WA and TX. According to the first image, during the 90th house Congress, most partisan delegates are democrats, having similar voting inclinations. While the second image showed unneglectable difference between WA and TX partisan delegates. In the 116th Congress, most WA partisan delegates are still showing democratic voting inclination while most TX partisan delegates have turned to republican.
+
+## Age
+```{r, echo = FALSE, eval = TRUE, message = FALSE}
+# set global variable year90 to the year of 90th house, 
+# create dataframe of party code and age of the voters in the 90th house
+year90 <- 1967
+house90_age <- data.frame("label" = house90$party_code, 
+                          "age" = year90 - house90$born)
+
+# make a histogram with density plot showing the density of the ages of the
+# voters in D and R party in 116th house
+ggplot(house90_age, aes(x = age, fill = label, color = label)) +
+  geom_histogram(aes(y = ..density..), position = "identity", alpha = 0.2) +
+  geom_density(alpha = 0.5) +
+  theme_bw(base_size = 20) +
+  scale_colour_manual(name = "", values = myColors) +
+  scale_fill_manual(name = "", values = myColors) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14)) +
+  labs(title = "90th House Age", x = "Age", y = "Density")
+
+# set global variable year116 to the year of 116th house, 
+# create dataframe of party code and age of the voters in the 116th house
+year116 <- 2019
+house116_age <- data.frame("label" = house116$party_code,
+                         "age" = year116 - house116$born)
+
+# filter the house116_age dataframe to exclude the I party since the voters of
+# this party are not representing the major partisanship
+house116_age_f <- filter(house116_age, label != "I")
+
+# make a histogram with density plot showing the density of the ages of the
+# voters in D and R party in 116th house
+ggplot(house116_age_f, aes(x = age, fill = label, color = label)) +
+  geom_histogram(aes(y = ..density..), position = "identity", alpha = 0.2) +
+  geom_density(alpha = 0.5) +
+  theme_bw(base_size = 20) +
+  scale_colour_manual(name = "", values = myColors) +
+  scale_fill_manual(name = "", values = myColors) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 14)) +
+  labs(title = "116th House Age (only includes D and R)", x = "Age", 
+       y = "Density")
+```
+
+These two visualizations are histograms focusing on the age of partisan delegates of the two major parties in the 90th and 116th congress. According to the first image, in the 90th congress, most of the republican delegates were around 40-50 years old, and most of the democratic delegates were 50~60 years old; while based on the data of the second image, in the 116th congress, most of the republican delegates were around 60 years old, and most of the democratic delegates were around 70 years old. Such data implies that the democratic partisan delegates have always been having averagely larger-aged delegates than the republican party.
+
+
+## Conclusion
+
+From the above visualizations, we focused on the congress voting data and found the differences between the democratic campaign and the republican campaign. These two party campaigns have differences in voting preferences, delegate ratio, as well as the age of partisan delegates. As the 90th congress was around 1967-1968, and the 116th is around 2019-2020, whether such differences is based on the world political environment then and now, and whether such differences have influences on every detailed proposal, further researches would be needed.
+
+
+
+# Code Appendix
+
+```{r ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
